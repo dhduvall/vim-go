@@ -24,6 +24,19 @@ if exists("*GoIndent")
   finish
 endif
 
+function! s:is_string_or_comment(lnum, col)
+  if !has('syntax_items')
+    return 0
+  endif
+
+  for id in synstack(a:lnum, a:col)
+    let synname = synIDattr(id, "name")
+    if synname == "goComment" || synname == "goString" || synname == "goRawString"
+      return 1
+    endif
+  endfor
+endfunction
+
 function! GoIndent(lnum) abort
   let prevlnum = prevnonblank(a:lnum-1)
   if prevlnum == 0
@@ -49,9 +62,12 @@ function! GoIndent(lnum) abort
     endif
   endfor
 
-  if prevl =~ '[({]\s*$'
-    " previous line opened a block
-    let ind += shiftwidth()
+  call cursor(a:lnum, 1)
+  let openline = searchpair('{\|(', '', '}\|)', 'nbW',
+    \ 's:is_string_or_comment(line("."), col("."))')
+  if openline != 0
+    " We're inside of a block so we indent one level
+    let ind = indent(openline) + shiftwidth()
   endif
   if prevl =~# '^\s*\(case .*\|default\):$'
     " previous line is part of a switch statement
